@@ -23,6 +23,14 @@ class Issue:
     node_tokens: list[str] = field(default_factory=list)    # for duplicate
     current_titles: list[str] = field(default_factory=list) # for duplicate
 
+    def __post_init__(self) -> None:
+        if self.type == "duplicate":
+            if not self.node_tokens:
+                raise ValueError(f"Issue {self.id}: duplicate type requires node_tokens")
+        elif self.type in ("naming", "structure"):
+            if not self.node_token:
+                raise ValueError(f"Issue {self.id}: {self.type} type requires node_token")
+
 
 @dataclass
 class LogEntry:

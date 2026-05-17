@@ -31,3 +31,28 @@ def test_load_config_partial_missing_raises():
     with patch.dict(os.environ, env, clear=True):
         with pytest.raises(ValueError, match="FEISHU_APP_SECRET"):
             load_config()
+
+
+def test_load_config_with_archive_token():
+    env = {
+        "FEISHU_APP_ID": "cli_test",
+        "FEISHU_APP_SECRET": "secret123",
+        "FEISHU_WIKI_SPACE_ID": "space456",
+        "ANTHROPIC_API_KEY": "sk-ant-test",
+        "FEISHU_ARCHIVE_PARENT_TOKEN": "arch_tok_abc",
+    }
+    with patch.dict(os.environ, env, clear=True):
+        cfg = load_config()
+    assert cfg.archive_parent_token == "arch_tok_abc"
+
+
+def test_load_config_archive_token_defaults_to_empty():
+    env = {
+        "FEISHU_APP_ID": "cli_test",
+        "FEISHU_APP_SECRET": "secret123",
+        "FEISHU_WIKI_SPACE_ID": "space456",
+        "ANTHROPIC_API_KEY": "sk-ant-test",
+    }
+    with patch.dict(os.environ, env, clear=True):
+        cfg = load_config()
+    assert cfg.archive_parent_token == ""
