@@ -5,9 +5,11 @@ from dataclasses import dataclass, field
 class WikiNode:
     node_token: str
     title: str
-    node_type: str          # "doc" | "folder" | "wiki"
+    node_type: str          # "origin" | "shortcut"
     parent_node_token: str
     has_child: bool
+    obj_token: str = ""     # Feishu document token, used for content API
+    content: str = ""       # body text excerpt, capped at 800 chars
     children: list["WikiNode"] = field(default_factory=list)
 
 
