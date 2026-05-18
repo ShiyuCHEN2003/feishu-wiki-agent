@@ -136,3 +136,96 @@ def test_feishu_client_has_no_delete_method():
     client = FeishuClient(FAKE_CONFIG)
     assert not hasattr(client, "delete_node"), "delete_node must not exist"
     assert not hasattr(client, "delete"), "delete must not exist"
+
+
+def _content_response(content: str):
+    m = MagicMock()
+    m.json.return_value = {"code": 0, "data": {"content": content}}
+    m.raise_for_status = MagicMock()
+    return m
+
+
+def _content_error_response():
+    m = MagicMock()
+    m.json.return_value = {"code": 1, "msg": "permission denied"}
+    m.raise_for_status = MagicMock()
+    return m
+
+
+def test_build_nodes_captures_obj_token(mocker):
+    mocker.patch("requests.post", return_value=_token_response())
+    mocker.patch("requests.get", return_value=_nodes_response([
+        {"node_token": "n1", "title": "Doc", "node_type": "origin",
+         "parent_node_token": "", "has_child": False, "obj_token": "obj_abc"},
+    ]))
+    client = FeishuClient(FAKE_CONFIG)
+    tree = client.get_wiki_tree()
+    assert tree[0].obj_token == "obj_abc"
+
+
+def test_get_doc_content_returns_text(mocker):
+    mocker.patch("requests.post", return_value=_token_response())
+    mocker.patch("requests.get", return_value=_content_response("这是文档正文内容"))
+    client = FeishuClient(FAKE_CONFIG)
+    content = client.get_doc_content("obj_abc")
+    assert content == "这是文档正文内容"
+
+
+def test_get_doc_content_caps_at_800_chars(mocker):
+    mocker.patch("requests.post", return_value=_token_response())
+    long_text = "x" * 1200
+    mocker.patch("requests.get", return_value=_content_response(long_text))
+    client = FeishuClient(FAKE_CONFIG)
+    content = client.get_doc_content("obj_abc")
+    assert len(content) == 800
+
+
+def test_get_doc_content_returns_empty_on_api_error(mocker):
+    mocker.patch("requests.post", return_value=_token_response())
+    mocker.patch("requests.get", return_value=_content_error_response())
+    client = FeishuClient(FAKE_CONFIG)
+    content = client.get_doc_content("obj_abc")
+    assert content == ""
+
+
+def test_get_doc_content_returns_empty_on_http_error(mocker):
+    mocker.patch("requests.post", return_value=_token_response())
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.side_effect = Exception("connection error")
+    mocker.patch("requests.get", return_value=mock_resp)
+    client = FeishuClient(FAKE_CONFIG)
+    content = client.get_doc_content("obj_abc")
+    assert content == ""
+
+
+def test_fetch_content_for_tree_populates_content(mocker):
+    mocker.patch("requests.post", return_value=_token_response())
+    mocker.patch("requests.get", return_value=_content_response("正文内容"))
+    from models import WikiNode
+    nodes = [WikiNode("n1", "Doc", "origin", "", False, obj_token="obj_abc")]
+    client = FeishuClient(FAKE_CONFIG)
+    client.fetch_content_for_tree(nodes)
+    assert nodes[0].content == "正文内容"
+
+
+def test_fetch_content_for_tree_skips_nodes_without_obj_token(mocker):
+    mocker.patch("requests.post", return_value=_token_response())
+    mock_get = mocker.patch("requests.get")
+    from models import WikiNode
+    nodes = [WikiNode("n1", "Doc", "origin", "", False, obj_token="")]
+    client = FeishuClient(FAKE_CONFIG)
+    client.fetch_content_for_tree(nodes)
+    mock_get.assert_not_called()
+
+
+def test_fetch_content_for_tree_recurses_into_children(mocker):
+    mocker.patch("requests.post", return_value=_token_response())
+    mocker.patch("requests.get", return_value=_content_response("子文档内容"))
+    from models import WikiNode
+    child = WikiNode("n2", "Child", "origin", "n1", False, obj_token="obj_child")
+    parent = WikiNode("n1", "Parent", "origin", "", True, obj_token="obj_parent",
+                      children=[child])
+    client = FeishuClient(FAKE_CONFIG)
+    client.fetch_content_for_tree([parent])
+    assert parent.content == "子文档内容"
+    assert child.content == "子文档内容"

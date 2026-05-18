@@ -62,6 +62,7 @@ class FeishuClient:
                 node_type=item["node_type"],
                 parent_node_token=item.get("parent_node_token", ""),
                 has_child=item.get("has_child", False),
+                obj_token=item.get("obj_token", ""),
             )
             if node.has_child:
                 child_items = self._list_nodes(parent_node_token=node.node_token)
@@ -72,6 +73,25 @@ class FeishuClient:
     def get_wiki_tree(self) -> list[WikiNode]:
         root_items = self._list_nodes()
         return self._build_nodes(root_items)
+
+    def get_doc_content(self, obj_token: str) -> str:
+        url = f"{_BASE}/docx/v1/documents/{obj_token}/raw_content"
+        try:
+            resp = requests.get(url, headers=self._headers())
+            resp.raise_for_status()
+            body = resp.json()
+            if body.get("code", 0) != 0:
+                return ""
+            return body.get("data", {}).get("content", "")[:800]
+        except Exception:
+            return ""
+
+    def fetch_content_for_tree(self, nodes: list[WikiNode]) -> None:
+        for node in nodes:
+            if node.obj_token:
+                node.content = self.get_doc_content(node.obj_token)
+            if node.children:
+                self.fetch_content_for_tree(node.children)
 
     # ── write ─────────────────────────────────────────────────────────────
 
