@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from models import WikiNode, Issue
-from analyzer import Analyzer
+from analyzer import Analyzer, _flatten
 
 FAKE_API_KEY = "sk-ant-test"
 
@@ -75,3 +75,21 @@ def test_analyze_passes_tree_as_json_to_claude(mocker):
     user_content = call_kwargs["messages"][0]["content"]
     assert "slam_deploy_lisi" in str(user_content)
     assert "SLAM部署文档" in str(user_content)
+
+
+def test_flatten_includes_content_when_present():
+    node = WikiNode(
+        node_token="tok1", title="Doc", node_type="origin",
+        parent_node_token="", has_child=False, content="摘要内容"
+    )
+    result = _flatten([node])
+    assert result[0]["content"] == "摘要内容"
+
+
+def test_flatten_omits_content_when_empty():
+    node = WikiNode(
+        node_token="tok1", title="Doc", node_type="origin",
+        parent_node_token="", has_child=False
+    )
+    result = _flatten([node])
+    assert "content" not in result[0]

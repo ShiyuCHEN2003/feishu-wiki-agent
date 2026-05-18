@@ -39,16 +39,33 @@ _REPORT_ISSUES_TOOL = {
 }
 
 
+_SYSTEM_PROMPT = (
+    "你是算法组知识库管理员助手。根据以下命名规范和结构分析维度，分析文档列表，"
+    "找出所有问题，调用 report_issues 工具返回结果。\n\n"
+    "命名规范：\n" + _NAMING_CONVENTION + "\n\n"
+    "分析维度：\n"
+    "1. 命名问题（naming）：不符合命名规范的文档\n"
+    "2. 结构问题（structure）：内容与所在目录不匹配，或同级文档之间缺乏逻辑层次\n"
+    "3. 重复问题（duplicate）：标题相似或内容主题重复的文档\n\n"
+    "如果文档提供了 content 字段，请结合内容摘要判断：\n"
+    "- 文档实际内容是否与其标题和所在目录一致\n"
+    "- 是否存在内容高度相似的重复文档"
+)
+
+
 def _flatten(nodes: list[WikiNode], depth: int = 0) -> list[dict]:
     result = []
     for node in nodes:
-        result.append({
+        entry = {
             "node_token": node.node_token,
             "title": node.title,
             "type": node.node_type,
             "parent": node.parent_node_token,
             "depth": depth,
-        })
+        }
+        if node.content:
+            entry["content"] = node.content
+        result.append(entry)
         if node.children:
             result.extend(_flatten(node.children, depth + 1))
     return result
@@ -66,11 +83,7 @@ class Analyzer:
             max_tokens=4096,
             tools=[_REPORT_ISSUES_TOOL],
             tool_choice={"type": "any"},
-            system=(
-                "你是算法组知识库管理员助手。根据以下命名规范分析文档列表，"
-                "找出所有命名不规范、结构混乱、主题重复的问题，调用 report_issues 工具返回结果。\n\n"
-                + _NAMING_CONVENTION
-            ),
+            system=_SYSTEM_PROMPT,
             messages=[
                 {
                     "role": "user",
