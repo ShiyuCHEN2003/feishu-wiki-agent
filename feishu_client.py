@@ -76,6 +76,8 @@ class FeishuClient:
 
     # Best-effort: returns "" on any network/API error so scans degrade gracefully.
     def get_doc_content(self, obj_token: str) -> str:
+        if not obj_token:
+            return ""
         url = f"{_BASE}/docx/v1/documents/{obj_token}/raw_content"
         try:
             resp = requests.get(url, headers=self._headers())
@@ -89,7 +91,8 @@ class FeishuClient:
 
     def fetch_content_for_tree(self, nodes: list[WikiNode]) -> None:
         for node in nodes:
-            if node.obj_token:
+            # Shortcuts may share obj_token with their origin; skip to avoid duplicate content.
+            if node.obj_token and node.node_type == "origin":
                 node.content = self.get_doc_content(node.obj_token)
             if node.children:
                 self.fetch_content_for_tree(node.children)
