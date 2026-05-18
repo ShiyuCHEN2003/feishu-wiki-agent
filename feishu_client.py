@@ -23,6 +23,8 @@ class FeishuClient:
         )
         resp.raise_for_status()
         data = resp.json()
+        if data.get("code", 0) != 0:
+            raise RuntimeError(f"Feishu auth error: {data}")
         self._token = data["tenant_access_token"]
         self._token_expires_at = time.time() + data["expire"]
         return self._token
@@ -41,7 +43,10 @@ class FeishuClient:
         while True:
             resp = requests.get(url, headers=self._headers(), params=params)
             resp.raise_for_status()
-            data = resp.json()["data"]
+            body = resp.json()
+            if body.get("code", 0) != 0:
+                raise RuntimeError(f"Feishu API error: {body}")
+            data = body["data"]
             items.extend(data.get("items", []))
             if not data.get("has_more"):
                 break
