@@ -3,6 +3,9 @@ import pytest
 from unittest.mock import patch
 from config import load_config, Config
 
+# Patch load_dotenv in all tests so a real .env file on disk doesn't interfere
+_NO_DOTENV = patch("config.load_dotenv")
+
 
 def test_load_config_success():
     env = {
@@ -11,7 +14,7 @@ def test_load_config_success():
         "FEISHU_WIKI_SPACE_ID": "space456",
         "ANTHROPIC_API_KEY": "sk-ant-test",
     }
-    with patch.dict(os.environ, env, clear=True):
+    with _NO_DOTENV, patch.dict(os.environ, env, clear=True):
         cfg = load_config()
     assert isinstance(cfg, Config)
     assert cfg.app_id == "cli_test"
@@ -21,14 +24,14 @@ def test_load_config_success():
 
 
 def test_load_config_missing_raises():
-    with patch.dict(os.environ, {}, clear=True):
+    with _NO_DOTENV, patch.dict(os.environ, {}, clear=True):
         with pytest.raises(ValueError, match="Missing required env vars"):
             load_config()
 
 
 def test_load_config_partial_missing_raises():
     env = {"FEISHU_APP_ID": "cli_test"}
-    with patch.dict(os.environ, env, clear=True):
+    with _NO_DOTENV, patch.dict(os.environ, env, clear=True):
         with pytest.raises(ValueError, match="FEISHU_APP_SECRET"):
             load_config()
 
@@ -41,7 +44,7 @@ def test_load_config_with_archive_token():
         "ANTHROPIC_API_KEY": "sk-ant-test",
         "FEISHU_ARCHIVE_PARENT_TOKEN": "arch_tok_abc",
     }
-    with patch.dict(os.environ, env, clear=True):
+    with _NO_DOTENV, patch.dict(os.environ, env, clear=True):
         cfg = load_config()
     assert cfg.archive_parent_token == "arch_tok_abc"
 
@@ -53,6 +56,6 @@ def test_load_config_archive_token_defaults_to_empty():
         "FEISHU_WIKI_SPACE_ID": "space456",
         "ANTHROPIC_API_KEY": "sk-ant-test",
     }
-    with patch.dict(os.environ, env, clear=True):
+    with _NO_DOTENV, patch.dict(os.environ, env, clear=True):
         cfg = load_config()
     assert cfg.archive_parent_token == ""
