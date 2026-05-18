@@ -1,5 +1,6 @@
 import time
 import pytest
+import requests
 from unittest.mock import patch, MagicMock
 from config import Config
 from feishu_client import FeishuClient
@@ -191,7 +192,7 @@ def test_get_doc_content_returns_empty_on_api_error(mocker):
 def test_get_doc_content_returns_empty_on_http_error(mocker):
     mocker.patch("requests.post", return_value=_token_response())
     mock_resp = MagicMock()
-    mock_resp.raise_for_status.side_effect = Exception("connection error")
+    mock_resp.raise_for_status.side_effect = requests.exceptions.RequestException("connection error")
     mocker.patch("requests.get", return_value=mock_resp)
     client = FeishuClient(FAKE_CONFIG)
     content = client.get_doc_content("obj_abc")
@@ -220,12 +221,17 @@ def test_fetch_content_for_tree_skips_nodes_without_obj_token(mocker):
 
 def test_fetch_content_for_tree_recurses_into_children(mocker):
     mocker.patch("requests.post", return_value=_token_response())
-    mocker.patch("requests.get", return_value=_content_response("子文档内容"))
+    mock_get = mocker.patch("requests.get")
+    mock_get.return_value.json.side_effect = [
+        _content_response("parent content").json.return_value,
+        _content_response("child content").json.return_value,
+    ]
+    mock_get.return_value.raise_for_status = MagicMock()
     from models import WikiNode
     child = WikiNode("n2", "Child", "origin", "n1", False, obj_token="obj_child")
     parent = WikiNode("n1", "Parent", "origin", "", True, obj_token="obj_parent",
                       children=[child])
     client = FeishuClient(FAKE_CONFIG)
     client.fetch_content_for_tree([parent])
-    assert parent.content == "子文档内容"
-    assert child.content == "子文档内容"
+    assert parent.content == "parent content"
+    assert child.content == "child content"

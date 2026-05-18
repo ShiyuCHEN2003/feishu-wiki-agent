@@ -74,17 +74,18 @@ class FeishuClient:
         root_items = self._list_nodes()
         return self._build_nodes(root_items)
 
+    # Best-effort: returns "" on any network/API error so scans degrade gracefully.
     def get_doc_content(self, obj_token: str) -> str:
         url = f"{_BASE}/docx/v1/documents/{obj_token}/raw_content"
         try:
             resp = requests.get(url, headers=self._headers())
             resp.raise_for_status()
-            body = resp.json()
-            if body.get("code", 0) != 0:
-                return ""
-            return body.get("data", {}).get("content", "")[:800]
-        except Exception:
+        except requests.exceptions.RequestException:
             return ""
+        body = resp.json()
+        if body.get("code", 0) != 0:
+            return ""
+        return body.get("data", {}).get("content", "")[:800]
 
     def fetch_content_for_tree(self, nodes: list[WikiNode]) -> None:
         for node in nodes:
