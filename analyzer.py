@@ -53,7 +53,7 @@ _REPORT_ISSUES_TOOL = {
 }
 
 _SYSTEM_PROMPT = (
-    "你是算法组知识库管理员助手。请逐一检查下面列表中 type=origin 的每个节点，"
+    "你是知识库管理员助手。请逐一检查下面列表中 type=origin 的每个节点，"
     "找出所有问题，调用 report_issues 工具返回结果。\n\n"
     "【命名规范】：\n"
     + _NAMING_CONVENTION

@@ -18,7 +18,7 @@ class Config:
     anthropic_api_key: str
     archive_parent_token: str = ""   # optional: node_token of _归档 folder
     categories: dict = None          # optional: {name: node_token} for topic categories
-    feishu_domain: str = ""          # optional: e.g. vlai.feishu.cn, for constructing wiki links
+    feishu_domain: str = ""          # optional: e.g. yourcompany.feishu.cn, for constructing wiki links
 
 
 def _parse_categories(raw: str) -> dict:

@@ -100,7 +100,7 @@ def _show_scan_summary(engine: WorkflowEngine) -> None:
 
 def run(engine: WorkflowEngine) -> None:
     console.print(Panel(
-        "[bold cyan]飞书知识库管理 Agent（算法组）[/bold cyan]\n输入 help 查看可用命令",
+        "[bold cyan]飞书知识库管理 Agent[/bold cyan]\n输入 help 查看可用命令",
         border_style="cyan",
     ))
     while True:
