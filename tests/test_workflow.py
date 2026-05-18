@@ -23,6 +23,21 @@ def _make_duplicate_issue() -> Issue:
 
 
 @pytest.fixture
+def mock_feishu():
+    return MagicMock()
+
+
+@pytest.fixture
+def mock_analyzer():
+    return MagicMock()
+
+
+@pytest.fixture
+def mock_logger():
+    return MagicMock()
+
+
+@pytest.fixture
 def engine():
     feishu = MagicMock()
     analyzer = MagicMock()
@@ -104,3 +119,11 @@ def test_duplicate_issue_confirm_calls_move(engine):
     engine_with_archive.start_scan()
     engine_with_archive.confirm_current()
     feishu.move_node.assert_called()
+
+
+def test_start_scan_fetches_content(mock_feishu, mock_analyzer, mock_logger):
+    engine = WorkflowEngine(mock_feishu, mock_analyzer, mock_logger)
+    mock_feishu.get_wiki_tree.return_value = []
+    mock_analyzer.analyze.return_value = []
+    engine.start_scan()
+    mock_feishu.fetch_content_for_tree.assert_called_once_with([])

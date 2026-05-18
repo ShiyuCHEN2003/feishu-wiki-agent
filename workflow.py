@@ -50,6 +50,7 @@ class WorkflowEngine:
         self.state = State.SCAN
         tree = self._feishu.get_wiki_tree()
         self.last_scan_node_count = self._count_nodes(tree)
+        self._feishu.fetch_content_for_tree(tree)
         self.state = State.ANALYZE
         issues = self._analyzer.analyze(tree)
         self.state = State.REPORT
