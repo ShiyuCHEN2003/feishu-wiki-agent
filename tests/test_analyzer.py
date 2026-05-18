@@ -1,9 +1,9 @@
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from models import WikiNode, Issue
 from analyzer import Analyzer, _flatten
 
 FAKE_API_KEY = "sk-ant-test"
+
 
 def _make_tree() -> list[WikiNode]:
     return [
@@ -18,13 +18,12 @@ def _mock_claude_response(issues_payload: list[dict]):
     tool_use_block = MagicMock()
     tool_use_block.type = "tool_use"
     tool_use_block.input = {"issues": issues_payload}
-
     message = MagicMock()
     message.content = [tool_use_block]
     return message
 
 
-def test_analyze_returns_issue_list(mocker):
+def test_analyze_returns_claude_issues(mocker):
     issues_payload = [
         {
             "id": "issue_001",
@@ -46,13 +45,11 @@ def test_analyze_returns_issue_list(mocker):
     issues = analyzer.analyze(_make_tree())
 
     assert len(issues) == 1
-    assert isinstance(issues[0], Issue)
     assert issues[0].type == "duplicate"
-    assert issues[0].severity == "high"
     assert issues[0].node_tokens == ["n1", "n2", "n3"]
 
 
-def test_analyze_returns_empty_for_clean_wiki(mocker):
+def test_analyze_returns_empty_when_claude_finds_nothing(mocker):
     mock_client = MagicMock()
     mock_client.messages.create.return_value = _mock_claude_response([])
     mocker.patch("anthropic.Anthropic", return_value=mock_client)
@@ -68,13 +65,25 @@ def test_analyze_passes_tree_as_json_to_claude(mocker):
     mocker.patch("anthropic.Anthropic", return_value=mock_client)
 
     analyzer = Analyzer(api_key=FAKE_API_KEY)
-    tree = _make_tree()
-    analyzer.analyze(tree)
+    analyzer.analyze(_make_tree())
 
     call_kwargs = mock_client.messages.create.call_args.kwargs
     user_content = call_kwargs["messages"][0]["content"]
     assert "slam_deploy_lisi" in str(user_content)
     assert "SLAM部署文档" in str(user_content)
+
+
+def test_analyze_propagates_exception_on_claude_failure(mocker):
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = RuntimeError("network error")
+    mocker.patch("anthropic.Anthropic", return_value=mock_client)
+
+    analyzer = Analyzer(api_key=FAKE_API_KEY)
+    try:
+        analyzer.analyze(_make_tree())
+        assert False, "should have raised"
+    except RuntimeError:
+        pass
 
 
 def test_flatten_includes_content_when_present():

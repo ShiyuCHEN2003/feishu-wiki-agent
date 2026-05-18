@@ -172,13 +172,13 @@ def test_get_doc_content_returns_text(mocker):
     assert content == "这是文档正文内容"
 
 
-def test_get_doc_content_caps_at_800_chars(mocker):
+def test_get_doc_content_caps_at_300_chars(mocker):
     mocker.patch("requests.post", return_value=_token_response())
     long_text = "x" * 1200
     mocker.patch("requests.get", return_value=_content_response(long_text))
     client = FeishuClient(FAKE_CONFIG)
     content = client.get_doc_content("obj_abc")
-    assert len(content) == 800
+    assert len(content) == 300
 
 
 def test_get_doc_content_returns_empty_on_api_error(mocker):

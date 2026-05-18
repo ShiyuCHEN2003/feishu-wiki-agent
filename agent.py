@@ -19,9 +19,9 @@ _HELP_TEXT = """
   帮助 / help        — 显示此帮助
 
 确认流程中的命令：
-  确认 / 同意        — 执行当前建议操作
-  跳过               — 跳过当前条目
-  取消全部           — 中止整个整理流程
+  y / 确认 / 同意   — 执行当前建议操作
+  n / 跳过          — 跳过当前条目
+  q / 取消全部      — 中止整个整理流程
 """
 
 
@@ -35,17 +35,17 @@ def parse_intent(text: str) -> str:
         return "help"
     if t in ("确认", "同意", "yes", "y"):
         return "confirm"
-    if t in ("跳过", "skip"):
+    if t in ("跳过", "skip", "n"):
         return "skip"
     if t in ("取消全部", "取消", "cancel", "quit", "q"):
         return "cancel"
     return "unknown"
 
 
-def format_issue(issue: Issue, index: int, total: int) -> str:
+def format_issue(issue: Issue, index: int, total: int, flat: list[dict] | None = None) -> str:
     color = _SEVERITY_COLOR.get(issue.severity, "white")
     severity_label = {"high": "高优先级", "medium": "中优先级", "low": "低优先级"}.get(issue.severity, "")
-    type_label = {"naming": "命名不规范", "structure": "结构问题", "duplicate": "主题重复"}.get(issue.type, issue.type)
+    type_label = {"naming": "命名不规范", "structure": "结构问题", "duplicate": "主题重复", "index": "缺少子文档目录"}.get(issue.type, issue.type)
 
     lines = [f"问题 {index}/{total} · {type_label} · [{color}]{severity_label}[/{color}]"]
     lines.append("─" * 45)
@@ -54,14 +54,29 @@ def format_issue(issue: Issue, index: int, total: int) -> str:
         lines.append("涉及文档：")
         for t in issue.current_titles:
             lines.append(f"  · {t}")
+    elif issue.type == "index":
+        lines.append(f"文档：{issue.current_title}")
+        lines.append("将写入以下子文档目录：")
+        for child in issue.child_index:
+            lines.append(f"  · {child['title']}")
+            lines.append(f"    {child['description']}")
     else:
         lines.append(f"文档：{issue.current_title}")
+        if flat and issue.node_token:
+            children = [e["title"] for e in flat if e.get("parent") == issue.node_token]
+            if children:
+                lines.append("子文档：")
+                for c in children:
+                    lines.append(f"  · {c}")
 
     lines.append("")
-    lines.append(f"建议操作：{issue.suggestion}")
+    if issue.target_parent_token:
+        lines.append(f"操作：将此文档移动到 → {issue.suggestion}")
+    else:
+        lines.append(f"建议操作：{issue.suggestion}")
     lines.append(f"理由：{issue.reason}")
     lines.append("")
-    lines.append("输入「确认」执行 / 「跳过」保留 / 「取消全部」中止")
+    lines.append("[y] 执行  [n] 跳过  [q] 取消全部")
     return "\n".join(lines)
 
 
@@ -90,7 +105,7 @@ def run(engine: WorkflowEngine) -> None:
     ))
     while True:
         try:
-            prompt = "确认/跳过/取消> " if engine.state == State.CONFIRM else "> "
+            prompt = "[y/n/q]> " if engine.state == State.CONFIRM else "> "
             text = console.input(f"[bold green]{prompt}[/bold green]")
         except (KeyboardInterrupt, EOFError):
             console.print("\n[dim]已退出。[/dim]")
@@ -102,8 +117,11 @@ def run(engine: WorkflowEngine) -> None:
             issue = engine.current_issue()
             if issue and intent == "confirm":
                 console.print("[green]✓ 正在执行...[/green]")
-                engine.confirm_current()
-                console.print("[green]✓ 已执行并记录日志[/green]")
+                err = engine.confirm_current()
+                if err:
+                    console.print(f"[red]✗ 执行失败：{err}[/red]")
+                else:
+                    console.print("[green]✓ 已执行并记录日志[/green]")
                 if engine.state == State.CONFIRM:
                     nxt = engine.current_issue()
                     if nxt:
@@ -119,7 +137,7 @@ def run(engine: WorkflowEngine) -> None:
                 engine.cancel_all()
                 console.print("[yellow]已取消全部，返回待机状态[/yellow]")
             else:
-                console.print("[dim]请输入「确认」「跳过」或「取消全部」[/dim]")
+                console.print("[dim]请输入 y（执行）/ n（跳过）/ q（取消全部）[/dim]")
             continue
 
         if intent == "scan":
@@ -131,7 +149,7 @@ def run(engine: WorkflowEngine) -> None:
                 if issue:
                     console.print(format_issue(issue, 1, len(engine.pending_issues)))
             else:
-                console.print("[green]✓ 扫描完成，未发现问题[/green]")
+                console.print(f"[green]✓ 扫描完成，共扫描 {engine.last_scan_node_count} 个节点，未发现问题[/green]")
         elif intent == "log":
             entries = engine._logger.read_recent(n=10)
             if not entries:
@@ -157,7 +175,7 @@ def main() -> None:
         console.print("请复制 .env.example 为 .env 并填写配置项")
         sys.exit(1)
     feishu = FeishuClient(config)
-    analyzer = Analyzer(api_key=config.anthropic_api_key)
+    analyzer = Analyzer(api_key=config.anthropic_api_key, categories=config.categories)
     logger = Logger()
     engine = WorkflowEngine(
         feishu_client=feishu,

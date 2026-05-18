@@ -20,16 +20,19 @@ class Issue:
     severity: str           # "high" | "medium" | "low"
     suggestion: str
     reason: str
-    node_token: str = ""                          # for naming / structure
-    current_title: str = ""                       # for naming / structure
+    node_token: str = ""                          # for naming / structure / index
+    obj_token: str = ""                           # underlying doc token, for rename / index write
+    current_title: str = ""                       # for naming / structure / index
     node_tokens: list[str] = field(default_factory=list)    # for duplicate
     current_titles: list[str] = field(default_factory=list) # for duplicate
+    target_parent_token: str = ""                 # for structure moves
+    child_index: list[dict] = field(default_factory=list)   # for index: [{title, description}]
 
     def __post_init__(self) -> None:
         if self.type == "duplicate":
             if not self.node_tokens:
                 raise ValueError(f"Issue {self.id}: duplicate type requires node_tokens")
-        elif self.type in ("naming", "structure"):
+        elif self.type in ("naming", "structure", "index"):
             if not self.node_token:
                 raise ValueError(f"Issue {self.id}: {self.type} type requires node_token")
 

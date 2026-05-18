@@ -17,6 +17,21 @@ class Config:
     wiki_space_id: str
     anthropic_api_key: str
     archive_parent_token: str = ""   # optional: node_token of _归档 folder
+    categories: dict = None          # optional: {name: node_token} for topic categories
+    feishu_domain: str = ""          # optional: e.g. vlai.feishu.cn, for constructing wiki links
+
+
+def _parse_categories(raw: str) -> dict:
+    """Parse 'name1:token1,name2:token2' into {name: token}."""
+    if not raw:
+        return {}
+    result = {}
+    for pair in raw.split(","):
+        pair = pair.strip()
+        if ":" in pair:
+            name, token = pair.split(":", 1)
+            result[name.strip()] = token.strip()
+    return result
 
 
 def load_config() -> Config:
@@ -30,4 +45,6 @@ def load_config() -> Config:
         wiki_space_id=os.environ["FEISHU_WIKI_SPACE_ID"],
         anthropic_api_key=os.environ["ANTHROPIC_API_KEY"],
         archive_parent_token=os.getenv("FEISHU_ARCHIVE_PARENT_TOKEN", ""),
+        categories=_parse_categories(os.getenv("FEISHU_CATEGORIES", "")),
+        feishu_domain=os.getenv("FEISHU_DOMAIN", ""),
     )

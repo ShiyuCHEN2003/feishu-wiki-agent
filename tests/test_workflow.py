@@ -71,7 +71,7 @@ def test_confirm_yes_calls_rename(engine):
     assert engine.state == State.CONFIRM
     engine.confirm_current()  # user says 确认
     engine._feishu.rename_node.assert_called_once_with(
-        node_token="n1", new_title="[技术文档][2026-05] 新文档名"
+        node_token="n1", new_title="[技术文档][2026-05] 新文档名", obj_token=""
     )
     engine._logger.record.assert_called_once()
 

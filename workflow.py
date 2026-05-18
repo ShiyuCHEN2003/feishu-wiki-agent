@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 from enum import Enum
 from models import Issue, LogEntry
 from feishu_client import FeishuClient
-from analyzer import Analyzer
+from analyzer import Analyzer, _flatten
 from logger import Logger
 
 _TZ = timezone(timedelta(hours=8))
@@ -43,6 +43,7 @@ class WorkflowEngine:
         self.pending_issues: list[Issue] = []
         self.current_index: int = 0
         self.last_scan_node_count: int = 0
+        self.last_scan_flat: list[dict] = []
 
     # ── public API ────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ class WorkflowEngine:
         tree = self._feishu.get_wiki_tree()
         self.last_scan_node_count = self._count_nodes(tree)
         self._feishu.fetch_content_for_tree(tree)
+        self.last_scan_flat = _flatten(tree)
         self.state = State.ANALYZE
         issues = self._analyzer.analyze(tree)
         self.state = State.REPORT
@@ -66,15 +68,21 @@ class WorkflowEngine:
             return None
         return self.pending_issues[self.current_index]
 
-    def confirm_current(self) -> None:
+    def confirm_current(self) -> Exception | None:
         issue = self.current_issue()
         if issue is None:
-            return
+            return None
         self.state = State.EXECUTE
-        self._execute(issue)
+        try:
+            self._execute(issue)
+        except Exception as e:
+            self.state = State.CONFIRM
+            self._advance()
+            return e
         self.state = State.LOG
         self._log(issue)
         self._advance()
+        return None
 
     def skip_current(self) -> None:
         self._advance()
@@ -98,7 +106,7 @@ class WorkflowEngine:
     def _execute(self, issue: Issue) -> None:
         if issue.type == "naming":
             new_title = _extract_new_title(issue.suggestion)
-            self._feishu.rename_node(node_token=issue.node_token, new_title=new_title)
+            self._feishu.rename_node(node_token=issue.node_token, new_title=new_title, obj_token=issue.obj_token)
         elif issue.type == "duplicate" and len(issue.node_tokens) > 1:
             if not self._archive_parent_token:
                 return  # archive token not configured — skip silently
@@ -107,13 +115,37 @@ class WorkflowEngine:
                     node_token=token, target_parent_token=self._archive_parent_token
                 )
         elif issue.type == "structure" and issue.node_token:
-            new_title = _extract_new_title(issue.suggestion)
-            if new_title != issue.current_title:
-                self._feishu.rename_node(node_token=issue.node_token, new_title=new_title)
+            if issue.target_parent_token:
+                self._feishu.move_node(
+                    node_token=issue.node_token,
+                    target_parent_token=issue.target_parent_token,
+                )
+            else:
+                new_title = _extract_new_title(issue.suggestion)
+                if new_title != issue.current_title:
+                    self._feishu.rename_node(node_token=issue.node_token, new_title=new_title)
+        elif issue.type == "index" and issue.obj_token and issue.child_index:
+            self._feishu.write_child_index(obj_token=issue.obj_token, children=issue.child_index)
 
     def _log(self, issue: Issue) -> None:
         now = datetime.now(_TZ).isoformat()
-        if issue.type in ("naming", "structure"):
+        if issue.type == "structure" and issue.target_parent_token:
+            entry = LogEntry(
+                timestamp=now, action="move",
+                node_token=issue.node_token,
+                from_value=issue.current_title,
+                to_value=issue.target_parent_token,
+                operator="system", confirmed_by="user", issue_id=issue.id,
+            )
+        elif issue.type == "index":
+            entry = LogEntry(
+                timestamp=now, action="index",
+                node_token=issue.node_token,
+                from_value=issue.current_title,
+                to_value=f"{len(issue.child_index)} 个子文档",
+                operator="system", confirmed_by="user", issue_id=issue.id,
+            )
+        elif issue.type in ("naming", "structure"):
             entry = LogEntry(
                 timestamp=now, action="rename",
                 node_token=issue.node_token,
