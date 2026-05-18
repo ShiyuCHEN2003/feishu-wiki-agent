@@ -101,3 +101,38 @@ def test_get_wiki_tree_handles_pagination(mocker):
     client = FeishuClient(FAKE_CONFIG)
     tree = client.get_wiki_tree()
     assert len(tree) == 5
+
+
+def _ok_response():
+    m = MagicMock()
+    m.json.return_value = {"code": 0}
+    m.raise_for_status = MagicMock()
+    return m
+
+
+def test_rename_node_calls_patch(mocker):
+    mocker.patch("requests.post", return_value=_token_response())
+    mock_patch = mocker.patch("requests.patch", return_value=_ok_response())
+    client = FeishuClient(FAKE_CONFIG)
+    client.rename_node(node_token="n1", new_title="[技术文档][2026-05] 新标题")
+    mock_patch.assert_called_once()
+    url = mock_patch.call_args[0][0]
+    assert "n1" in url
+    body = mock_patch.call_args.kwargs.get("json") or mock_patch.call_args[1].get("json")
+    assert body["title"] == "[技术文档][2026-05] 新标题"
+
+
+def test_move_node_calls_post(mocker):
+    mocker.patch("requests.post", side_effect=[
+        _token_response(),
+        _ok_response(),
+    ])
+    client = FeishuClient(FAKE_CONFIG)
+    client.move_node(node_token="n1", target_parent_token="folder_abc")
+    # No assertion needed beyond "it didn't raise"
+
+
+def test_feishu_client_has_no_delete_method():
+    client = FeishuClient(FAKE_CONFIG)
+    assert not hasattr(client, "delete_node"), "delete_node must not exist"
+    assert not hasattr(client, "delete"), "delete must not exist"

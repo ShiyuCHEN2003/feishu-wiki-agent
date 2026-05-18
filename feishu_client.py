@@ -72,3 +72,23 @@ class FeishuClient:
     def get_wiki_tree(self) -> list[WikiNode]:
         root_items = self._list_nodes()
         return self._build_nodes(root_items)
+
+    # ── write ─────────────────────────────────────────────────────────────
+
+    def rename_node(self, node_token: str, new_title: str) -> None:
+        url = f"{_BASE}/wiki/v2/spaces/{self._config.wiki_space_id}/nodes/{node_token}"
+        resp = requests.patch(url, headers=self._headers(), json={"title": new_title})
+        resp.raise_for_status()
+        body = resp.json()
+        if body.get("code", 0) != 0:
+            raise RuntimeError(f"Feishu API error on rename: {body}")
+
+    def move_node(self, node_token: str, target_parent_token: str) -> None:
+        url = f"{_BASE}/wiki/v2/spaces/{self._config.wiki_space_id}/nodes/{node_token}/move"
+        resp = requests.post(
+            url, headers=self._headers(), json={"target_parent_token": target_parent_token}
+        )
+        resp.raise_for_status()
+        body = resp.json()
+        if body.get("code", 0) != 0:
+            raise RuntimeError(f"Feishu API error on move: {body}")
