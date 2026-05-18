@@ -45,12 +45,27 @@ HTTPS_PROXY=          # Anthropic API 代理（如需要）
 
 ### 3. 飞书应用权限
 
-在飞书开放平台为应用开启以下权限：
+在[飞书开放平台](https://open.feishu.cn/)为应用开启以下权限：
 
-- `wiki:wiki` — 知识库读取
-- `wiki:wiki:write` — 知识库写入（移动节点）
-- `docx:document` — 文档读取
-- `docx:document:write` — 文档写入（重命名、写入内容）
+| 权限名称 | 权限标识 |
+|---|---|
+| 创建及编辑新版文档 | `docx:document` |
+| 编辑新版文档 | `docx:document:write_only` |
+| 查看、评论和下载云空间中所有文件 | `drive:drive:readonly` |
+| 上传、下载文件到云空间 | `drive:file` |
+| 查看、编辑和管理知识库 | `wiki:wiki` |
+
+> `im:chat:readonly` / `im:message:readonly` 等群消息权限为可选，本 Agent 不使用。
+
+### 4. 将机器人加入知识库
+
+API 权限只控制接口调用范围，还需在知识库内为机器人授权：
+
+1. 打开飞书，进入目标知识库
+2. 点击右上角 **···** → **更多设置** → **成员管理**
+3. 点击**添加成员**，搜索并选择你的应用机器人
+4. 权限设置为**管理员**
+5. 保存
 
 ### 4. 运行
 
